@@ -1,0 +1,38 @@
+{
+  "description": "CAR Ensemble — Final Configuration (Run 3)",
+  "routing": {
+    "ROUTE_SIMPLE": 0.15,
+    "ROUTE_COMPLEX": 0.40,
+    "UPGRADE_RATIO": 1.5
+  },
+  "complexity_weights": {
+    "iou": 0.35,
+    "proximity": 0.30,
+    "coverage": 0.20,
+    "count": 0.15
+  },
+  "matching": {
+    "IOU_MATCH": 0.30,
+    "PROXIMITY_PX": 100
+  },
+  "merger_weights": {
+    "W_S1": 1.0,
+    "W_S2": 1.5,
+    "W_S3": 2.0,
+    "W_S3_BONUS": 2.5
+  },
+  "confidence_thresholds": {
+    "simple":    {"s1": 0.70, "s2": 0.65, "s3": 0.60},
+    "ambiguous": {"s1": 0.65, "s2": 0.60, "s3": 0.55},
+    "complex":   {"s1": 0.55, "s2": 0.55, "s3": 0.50}
+  },
+  "classes": ["raw_apple", "raw_plum"],
+  "hardware": {
+    "gpu": "NVIDIA Tesla T4",
+    "cuda": "12.8",
+    "python": "3.12.13",
+    "pytorch": "2.10.0+cu128",
+    "ultralytics": "8.4.46",
+    "platform": "Google Colab Pro"
+  }
+}
