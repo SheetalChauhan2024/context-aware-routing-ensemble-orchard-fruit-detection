@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Model weights (download separately — see weights/README.md)
+weights/stage1_yolo11n/
+weights/stage2_yolo11s/
+weights/stage3_yolo11m/
+*.pt
+*.pth
+
+# Datasets
+data/
+*.zip
+*.tar.gz
+
+# Outputs
+results/*.json
+results/plots/
+results/visualizations/
+results/paper_figures/
+results/demo_analysis/
+results/ablation/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
