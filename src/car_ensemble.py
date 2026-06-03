@@ -31,7 +31,7 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 
 from .complexity_analyzer import ComplexityAnalyzer
-from .utils import soft_nms, weighted_vote_merge
+from .utils import weighted_vote_merge
 
 
 # ── Default confidence thresholds per route ───────────────────────────────────
@@ -175,13 +175,10 @@ class CAREnsemble:
             )
             detections['s3'] = (s3_boxes, s3_scores, s3_classes)
 
-        # ── Merge + Soft-NMS ─────────────────────────────────────────────────
+        # ── Merge ────────────────────────────────────────────────────────────
         merged_boxes, merged_scores, merged_classes = weighted_vote_merge(detections)
-        final_boxes, final_scores, final_classes = soft_nms(
-            merged_boxes, merged_scores, merged_classes
-        )
 
-        return self._build_result(final_boxes, final_scores, final_classes, route, C, t0)
+        return self._build_result(merged_boxes, merged_scores, merged_classes, route, C, t0)
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 

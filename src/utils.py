@@ -2,7 +2,6 @@
 utils.py
 ────────
 Utility functions for the CAR Ensemble:
-  • Smart Soft-NMS  — Gaussian decay for same-class boxes; cross-class preserved
   • Weighted Vote Merger — combines detections from multiple stages
 """
 
@@ -10,66 +9,6 @@ from __future__ import annotations
 
 import numpy as np
 from typing import List, Tuple, Dict
-
-
-# ── Soft-NMS ──────────────────────────────────────────────────────────────────
-
-def soft_nms(
-    boxes: np.ndarray,
-    scores: np.ndarray,
-    classes: np.ndarray,
-    sigma: float = 0.5,
-    score_thresh: float = 0.001,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Smart Soft-NMS with Gaussian decay.
-
-    Same-class boxes: score is decayed by Gaussian based on IoU overlap.
-    Different-class boxes: score is preserved (cross-class suppression disabled).
-
-    Parameters
-    ----------
-    boxes  : (N, 4) array of [x1, y1, x2, y2]
-    scores : (N,)  array of confidence scores
-    classes: (N,)  array of integer class IDs
-    sigma  : Gaussian decay parameter
-    score_thresh : boxes below this after decay are removed
-
-    Returns
-    -------
-    Filtered (boxes, scores, classes) — sorted by descending score.
-    """
-    if len(boxes) == 0:
-        return boxes, scores, classes
-
-    boxes   = boxes.astype(float)
-    scores  = scores.copy().astype(float)
-    classes = classes.copy()
-
-    order = np.argsort(-scores).tolist()
-    keep  = []
-
-    while order:
-        idx = order[0]
-        keep.append(idx)
-        order = order[1:]
-
-        for j in order:
-            if classes[j] != classes[idx]:
-                # Different class — no suppression
-                continue
-            iou = _iou(boxes[idx], boxes[j])
-            # Gaussian decay
-            scores[j] *= np.exp(-(iou ** 2) / sigma)
-
-        # Remove boxes whose score has decayed below threshold
-        order = [j for j in order if scores[j] >= score_thresh]
-
-    keep_arr = np.array(keep, dtype=int)
-    sort_idx = np.argsort(-scores[keep_arr])
-    keep_arr = keep_arr[sort_idx]
-
-    return boxes[keep_arr], scores[keep_arr], classes[keep_arr]
 
 
 def _iou(box_a: np.ndarray, box_b: np.ndarray) -> float:
