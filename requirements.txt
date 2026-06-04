@@ -4,4 +4,3 @@ torchvision
 opencv-python
 numpy
 Pillow
-scipy
