@@ -31,7 +31,7 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 
 from .complexity_analyzer import ComplexityAnalyzer
-from .utils import weighted_vote_merge
+from .utils import weighted_vote_merge, _iou
 
 
 # ── Default confidence thresholds per route ───────────────────────────────────
@@ -42,6 +42,23 @@ CONF_THRESHOLDS: Dict[str, Dict[str, float]] = {
 }
 
 UPGRADE_RATIO = 1.5   # S2/S1 detection ratio that triggers upgrade to complex
+PROXIMITY_PX  = 100   # pixel distance for Route B isolation check
+
+
+def _has_nearby(box: np.ndarray, others: np.ndarray, proximity: float = PROXIMITY_PX) -> bool:
+    """Return True if any other box centre is within proximity pixels of this box centre."""
+    if len(others) == 0:
+        return False
+    cx = (box[0] + box[2]) / 2.0
+    cy = (box[1] + box[3]) / 2.0
+    for o in others:
+        if np.array_equal(o, box):
+            continue
+        ocx = (o[0] + o[2]) / 2.0
+        ocy = (o[1] + o[3]) / 2.0
+        if ((cx - ocx) ** 2 + (cy - ocy) ** 2) ** 0.5 < proximity:
+            return True
+    return False
 
 CLASS_NAMES = ['raw_apple', 'raw_plum']
 
@@ -153,7 +170,6 @@ class CAREnsemble:
             s2_boxes, s2_scores, s2_classes, _ = self._run_stage(
                 's2', image, conf=self.conf[route]['s2']
             )
-            detections['s2'] = (s2_boxes, s2_scores, s2_classes)
 
             # Dynamic upgrade
             if (
@@ -167,6 +183,70 @@ class CAREnsemble:
                         f"[CAR] Dynamic upgrade → complex "
                         f"(S2={len(s2_boxes)} / S1={len(s1_boxes)})"
                     )
+
+            if route == 'ambiguous':
+                # ── Route B isolation logic ───────────────────────────────────
+                # High-confidence Stage 1 detections with no nearby neighbours
+                # are accepted directly without Stage 2 verification.
+                # Remaining detections are verified against Stage 2.
+                high_conf_boxes,  high_conf_scores,  high_conf_classes  = [], [], []
+                ambiguous_boxes,  ambiguous_scores,  ambiguous_classes  = [], [], []
+
+                for i in range(len(s1_boxes)):
+                    if (s1_scores[i] >= self.conf['ambiguous']['s1']
+                            and not _has_nearby(s1_boxes[i], s1_boxes)):
+                        high_conf_boxes.append(s1_boxes[i])
+                        high_conf_scores.append(s1_scores[i])
+                        high_conf_classes.append(s1_classes[i])
+                    else:
+                        ambiguous_boxes.append(s1_boxes[i])
+                        ambiguous_scores.append(s1_scores[i])
+                        ambiguous_classes.append(s1_classes[i])
+
+                # Verify ambiguous Stage 1 detections against Stage 2
+                verified_boxes, verified_scores, verified_classes = [], [], []
+                for i in range(len(ambiguous_boxes)):
+                    for j in range(len(s2_boxes)):
+                        if (s2_classes[j] == ambiguous_classes[i]
+                                and _iou(ambiguous_boxes[i], s2_boxes[j]) >= 0.30):
+                            # Weighted consensus box
+                            wb = (ambiguous_boxes[i] + s2_boxes[j]) / 2.0
+                            ws = (ambiguous_scores[i] + s2_scores[j]) / 2.0
+                            verified_boxes.append(wb)
+                            verified_scores.append(ws)
+                            verified_classes.append(ambiguous_classes[i])
+                            break
+
+                # Add Stage 2 detections not matched by any Stage 1 box
+                for j in range(len(s2_boxes)):
+                    if not any(
+                        _iou(s2_boxes[j], s1_boxes[i]) >= 0.30
+                        for i in range(len(s1_boxes))
+                    ):
+                        verified_boxes.append(s2_boxes[j])
+                        verified_scores.append(s2_scores[j])
+                        verified_classes.append(s2_classes[j])
+
+                # Combine high-confidence isolated + verified detections
+                all_boxes   = high_conf_boxes  + verified_boxes
+                all_scores  = high_conf_scores + verified_scores
+                all_classes = high_conf_classes + verified_classes
+
+                if all_boxes:
+                    detections = {'s1': (
+                        np.array(all_boxes),
+                        np.array(all_scores),
+                        np.array(all_classes, dtype=int),
+                    )}
+                else:
+                    detections = {'s1': (
+                        np.empty((0, 4)),
+                        np.empty(0),
+                        np.empty(0, dtype=int),
+                    )}
+            else:
+                # Route upgraded to complex — pass all Stage 2 detections
+                detections['s2'] = (s2_boxes, s2_scores, s2_classes)
 
         # ── Stage 3 ──────────────────────────────────────────────────────────
         if route == 'complex':
